@@ -5,11 +5,12 @@
 
 ## 👥 Członkowie zespołu
 
-| Imię i nazwisko        | Proponowana rola |
-|------------------------|---|
-| Denis Bichler 71564    | Pozyskiwanie i wstępna obróbka danych |
-| Kasper Borecki 71970   | Analiza danych i modelowanie |
-| Paweł Angielczyk 72530 | Wizualizacje, raport końcowy |
+| Imię i nazwisko        | Proponowana rola                                            |
+|------------------------|-------------------------------------------------------------|
+| Denis Bichler 71564    | Pozyskiwanie danych, wstępna obróbka i czyszczenie datasetu |
+| Kasper Borecki 71970   | Analiza danych, modelowanie predykcyjne, ewaluacja modeli   |
+| Paweł Angielczyk 72530 | Wizualizacje, raport końcowy, notebook EDA                  |
+| Jakub Wierzbicki 66846 | Wsparcie przy analizie i replikacji wyników                 |
 
 > Role mogą być modyfikowane w trakcie projektu według potrzeb.
 
