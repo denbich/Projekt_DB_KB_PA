@@ -1,5 +1,5 @@
-# Projekt_DB_KB_PA
-**Projekt: Denis B. · Kasper B. · Paweł A.**
+# Projekt_ZjPwDSiAI_Gr6
+**Projekt: Denis B. · Kasper B. · Paweł A. · Jakub W.**
 
 ---
 
