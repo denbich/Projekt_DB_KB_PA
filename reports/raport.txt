@@ -1,0 +1,341 @@
+========================================================================
+    RAPORT PROJEKTU
+    Analiza i przewidywanie cen samochodów używanych w Polsce
+    Grupa 6 | Gr1 | 2025/2026
+========================================================================
+
+------------------------------------------------------------------------
+1. CEL PROJEKTU
+------------------------------------------------------------------------
+
+Celem projektu jest analiza rynku samochodów używanych w Polsce oraz
+zbudowanie modelu predykcyjnego pozwalającego przewidzieć cenę pojazdu
+na podstawie jego parametrów technicznych i lokalizacji ogłoszenia.
+
+Projekt odpowiada na następujące pytania badawcze:
+
+  1. Jakie czynniki mają największy wpływ na cenę samochodu używanego
+     w Polsce (rok produkcji, przebieg, marka, pojemność silnika,
+     rodzaj paliwa)?
+
+  2. Jak cena zmienia się w zależności od przebiegu i roku produkcji —
+     czy zależność jest liniowa, czy bardziej złożona?
+
+  3. Czy rodzaj paliwa (benzyna, diesel, elektryczny, hybrydowy)
+     istotnie różnicuje cenę pojazdu?
+
+  4. Które marki i województwa charakteryzują się najwyższymi cenami
+     ofertowymi?
+
+  5. Jak dobrze można przewidzieć cenę samochodu na podstawie jego
+     parametrów technicznych — porównanie modeli regresji liniowej,
+     Random Forest i XGBoost?
+
+Hipotezy robocze:
+  H1: Rok produkcji i przebieg są najsilniejszymi predyktorami ceny.
+  H2: Samochody elektryczne i hybrydowe są istotnie droższe niż
+      benzynowe/dieselowe przy porównywalnym roku produkcji.
+  H3: Model Random Forest lub XGBoost osiągnie lepsze wyniki predykcji
+      niż regresja liniowa.
+
+------------------------------------------------------------------------
+2. ŹRÓDŁO I OPIS DANYCH
+------------------------------------------------------------------------
+
+Źródło  : Kaggle
+Nazwa   : Car Prices Poland
+URL     : https://www.kaggle.com/datasets/aleksandrglotov/car-prices-poland
+Autor   : Aleksandr Glotov
+Zebrane : styczeń 2022 (web scraping z polskiego serwisu ogłoszeniowego)
+Plik    : data/raw/Car_Prices_Poland_Kaggle.csv
+
+Oryginalne kolumny:
+  mark            — marka samochodu (np. BMW, Toyota)
+  model           — model samochodu
+  generation_name — generacja modelu
+  year            — rok produkcji
+  mileage         — przebieg (km)
+  vol_engine      — pojemność silnika (cm³)
+  fuel            — rodzaj paliwa
+  city            — miasto ogłoszenia
+  province        — województwo
+  price           — cena ofertowa (PLN) — zmienna docelowa
+
+Rozmiar po czyszczeniu: 111 376 rekordów, 20 cech
+
+Rozkład paliw:
+  benzyna (gasoline) : 58 169  (52,2%)
+  diesel             : 46 029  (41,3%)
+  LPG                :  4 103  ( 3,7%)
+  hybrid             :  2 280  ( 2,0%)
+  electric           :    753  ( 0,7%)
+  CNG                :     42  ( 0,04%)
+
+Top 10 marek (liczba ogłoszeń):
+  1. Audi          11 001
+  2. BMW           10 789
+  3. Volkswagen    10 449
+  4. Opel          10 012
+  5. Ford           9 347
+  6. Renault        6 789
+  7. Mercedes-Benz  6 776
+  8. Skoda          5 722
+  9. Peugeot        4 981
+  10. Toyota        4 976
+
+------------------------------------------------------------------------
+3. CECHY I PARAMETRY
+------------------------------------------------------------------------
+
+Zmienne wejściowe (cechy):
+  year            — rok produkcji
+  mileage         — przebieg (km)
+  vol_engine      — pojemność silnika (cm³)
+  fuel            — rodzaj paliwa (one-hot encoded)
+  mark            — marka (label encoded / median price encoding)
+  province        — województwo (label encoded)
+
+Wygenerowane cechy inżynieryjne:
+  car_age              — wiek samochodu (2022 - year)
+  mileage_per_year     — średni roczny przebieg (mileage / car_age)
+  log_price            — logarytm naturalny ceny (normalizacja rozkładu)
+  is_electric_hybrid   — flaga: 1 jeśli elektryczny lub hybrydowy
+  mark_median_price    — mediana ceny dla danej marki
+  fuel_diesel/electric/gasoline/hybrid/lpg — one-hot encoding paliwa
+
+Zmienna docelowa:
+  price — cena ofertowa pojazdu (PLN)
+
+Statystyki opisowe zmiennych numerycznych:
+                      min       25%       50%       75%       max      mean      std
+  year              1990      2009      2013      2017      2022    2012.9      5.6
+  mileage (km)         0    69 500   147 203   203 000 1 000 000  141 891   91 077
+  vol_engine (cm³)     0     1 461     1 781     1 995     6 600    1 812      640
+  price (PLN)        900    21 200    41 500    81 000 1 368 341   68 819   82 619
+
+------------------------------------------------------------------------
+4. EDA — EKSPLORACYJNA ANALIZA DANYCH
+------------------------------------------------------------------------
+
+Przeprowadzona w notebooku: notebooks/01_EDA.ipynb
+Wykresy zapisane w: reports/figures/
+
+4.1 Rozkład ceny
+  - Rozkład silnie prawostronnie skośny (długi ogon w stronę drogich aut).
+  - Mediana ceny: ~41 500 PLN, średnia: ~68 819 PLN.
+  - Po transformacji log(price) rozkład zbliżony do normalnego.
+  - Wykresy: 01_price_distribution.png
+
+4.2 Cena vs. rok produkcji
+  - Wyraźna zależność pozytywna — nowsze auta są droższe.
+  - Widoczny gwałtowny wzrost cen dla roczników po 2018.
+  - Wykres: 01_price_by_year.png
+
+4.3 Cena vs. przebieg
+  - Silna ujemna korelacja — wyższy przebieg = niższa cena.
+  - Zależność nieliniowa (wykładnicza), wyraźna przy niskim przebiegu.
+  - Wykres: 01_price_vs_mileage.png
+
+4.4 Rozkład paliw
+  - Dominacja benzyny i diesla (łącznie ~93% ogłoszeń).
+  - Pojazdy elektryczne i hybrydowe stanowią margines (~2,7%).
+  - Wykres: 01_fuel_distribution.png
+
+4.5 Cena wg rodzaju paliwa
+  - Auta elektryczne i hybrydowe istotnie droższe (mediana ~2–3x
+    wyższa niż benzyna/diesel).
+  - LPG — najtańsze pojazdy.
+  - Wykres: 01_price_by_fuel.png, 04_pb3_price_by_fuel.png
+
+4.6 Mediana ceny wg marki
+  - Najdroższe marki: Mercedes-Benz, BMW, Audi, Volvo, Porsche.
+  - Najtańsze: Daewoo, FSO, Fiat.
+  - Wykres: 01_median_price_by_mark.png, 01_top_marks.png
+
+4.7 Cena wg województwa
+  - Najwyższe ceny: mazowieckie, małopolskie, pomorskie.
+  - Najniższe: świętokrzyskie, lubelskie.
+  - Wykres: 01_price_by_province.png, 04_pb4_marks_provinces.png
+
+4.8 Analiza korelacji
+  - Najsilniejsze korelacje z ceną (Pearson):
+      year        +0.71  (im nowszy, tym droższy)
+      mileage     -0.51  (im wyższy przebieg, tym tańszy)
+      vol_engine  +0.38  (większa pojemność = wyższa cena)
+      car_age     -0.71  (im starszy, tym tańszy)
+  - Heatmapa: 01_correlation_heatmap.png, 04_pb1_correlations.png
+
+4.9 Czyszczenie danych (notebooks/02_preprocessing.ipynb)
+  - Usunięto wiersze z brakującymi wartościami kluczowych kolumn.
+  - Usunięto wartości odstające (cena < 900 PLN, przebieg > 1 000 000 km).
+  - Zastosowano one-hot encoding dla zmiennych kategorycznych.
+  - Wykres rozkładów po czyszczeniu: 02_clean_distributions.png
+
+------------------------------------------------------------------------
+5. ANALIZA I INTERPRETACJA
+------------------------------------------------------------------------
+
+5.1 Testy statystyczne
+
+  Test Kruskal-Wallis (cena vs. rodzaj paliwa):
+    H0: Mediany cen są równe dla wszystkich rodzajów paliwa.
+    Wynik: p < 0.001 → Odrzucamy H0.
+    Wniosek: Rodzaj paliwa istotnie różnicuje cenę pojazdu.
+             Auta elektryczne i hybrydowe są statystycznie droższe.
+
+  Test ANOVA (cena vs. marka):
+    Wynik: p < 0.001 → Marka jest istotnym czynnikiem cenowym.
+
+5.2 Wyniki modelowania
+
+  Dane podzielono na zbiór treningowy (80%) i testowy (20%).
+  Zastosowano walidację krzyżową 5-fold na zbiorze treningowym.
+
+  +----------------------+----------+----------+-------+--------------+
+  | Model                |   RMSE   |   MAE    |   R²  | CV R² (5-fold)|
+  +----------------------+----------+----------+-------+--------------+
+  | Linear Regression    | 38 707   | 17 500   | 0.784 |    0.885     |
+  | Ridge (alpha=1)      | 38 707   | 17 500   | 0.784 |    0.885     |
+  | Lasso (alpha=0.001)  | 38 739   | 17 513   | 0.784 |    0.885     |
+  | Random Forest        | 28 204   | 12 500   | 0.885 |    0.927     |
+  | XGBoost              | 27 622   | 12 351   | 0.890 |    0.934     |
+  +----------------------+----------+----------+-------+--------------+
+
+  Wykresy: 03_model_comparison.png, 04_pb5_model_comparison.png
+
+5.3 Ważność cech (Feature Importance — Random Forest / XGBoost)
+
+  Najważniejsze cechy predykcji ceny:
+    1. year / car_age           — najsilniejszy predyktor
+    2. mileage                  — drugi najsilniejszy
+    3. mark_median_price        — marka pojazdu (zakodowana)
+    4. vol_engine               — pojemność silnika
+    5. mileage_per_year         — średni roczny przebieg
+    6. is_electric_hybrid       — flaga elektryczny/hybrydowy
+
+  Wykres: 03_feature_importance.png
+
+5.4 Analiza residuów
+
+  - Residua modeli liniowych wykazują heteroskedastyczność
+    (wariancja błędu rośnie dla drogich aut).
+  - Random Forest i XGBoost mają bardziej jednorodne residua.
+  - Wykres: 03_residuals.png
+
+5.5 Wnioski z analizy
+
+  1. Rok produkcji i przebieg są zdecydowanie najsilniejszymi
+     predyktorami ceny — H1 POTWIERDZONA.
+
+  2. Auta elektryczne i hybrydowe są statystycznie istotnie droższe
+     od benzynowych/dieselowych — H2 POTWIERDZONA.
+
+  3. XGBoost osiągnął najlepsze wyniki (R²=0.89, RMSE=27 622 PLN),
+     wyraźnie przewyższając regresję liniową — H3 POTWIERDZONA.
+
+  4. Zależność ceny od przebiegu i roku jest nieliniowa —
+     modele drzewiaste radzą sobie z tym lepiej niż regresja liniowa.
+
+  5. Marka i województwo mają istotny wpływ na cenę, jednak
+     mniejszy niż parametry techniczne pojazdu.
+
+------------------------------------------------------------------------
+6. LINK DO REPOZYTORIUM
+------------------------------------------------------------------------
+
+  GitHub: https://github.com/denbich/Projekt_ZjPwDSiAI_Gr6
+
+  Repozytorium zawiera:
+  - pełny kod źródłowy (notebooks/, src/)
+  - skrypty replikacji wyników (replication/)
+  - wygenerowane wykresy (reports/figures/)
+  - instrukcję uruchomienia (replication/INSTRUKCJA.md)
+
+  Dane surowe NIE są śledzone przez Git — należy je pobrać
+  ręcznie wg instrukcji w data/raw/ZRODLO.md.
+
+------------------------------------------------------------------------
+7. PODZIAŁ PRACY / WKŁAD CZŁONKÓW GRUPY
+------------------------------------------------------------------------
+
+  ID     | Nazwisko, Imię       | Wkład
+  -------|----------------------|--------------------------------------
+  71564  | Bichler, Denis       | Pozyskiwanie danych, wstępna obróbka
+         |                      | i czyszczenie datasetu
+         |                      | (data_utils.py, 02_preprocessing.ipynb)
+  -------|----------------------|--------------------------------------
+  71970  | Borecki, Kasper      | Analiza danych, modelowanie predykcyjne,
+         |                      | ewaluacja modeli
+         |                      | (03_modeling.ipynb)
+  -------|----------------------|--------------------------------------
+  72530  | Angielczyk, Paweł    | Wizualizacje, raport końcowy,
+         |                      | notebook EDA
+         |                      | (01_EDA.ipynb, 04_visualization.ipynb,
+         |                      |  plot_utils.py)
+  -------|----------------------|--------------------------------------
+  66846  | Wierzbicki, Jakub    | Wsparcie przy analizie i replikacji
+         |                      | wyników (replication/)
+  -------|----------------------|--------------------------------------
+
+------------------------------------------------------------------------
+8. ŚRODOWISKO I TECHNOLOGIE
+------------------------------------------------------------------------
+
+  Język         : Python 3.10+
+  Notebooki     : Jupyter Notebook / JupyterLab
+
+  Biblioteki:
+    pandas>=2.0.0       — przetwarzanie danych
+    numpy>=1.24.0       — obliczenia numeryczne
+    matplotlib>=3.7.0   — wizualizacje
+    seaborn>=0.12.0     — wizualizacje statystyczne
+    plotly>=5.15.0      — interaktywne wykresy
+    scipy>=1.11.0       — testy statystyczne
+    statsmodels>=0.14.0 — modelowanie statystyczne
+    scikit-learn>=1.3.0 — ML (regresja liniowa, Random Forest)
+    xgboost>=2.0.0      — gradient boosting
+
+  Instalacja środowiska:
+    pip install -r requirements.txt
+
+------------------------------------------------------------------------
+9. STRUKTURA PLIKÓW PROJEKTU
+------------------------------------------------------------------------
+
+  Projekt_DB_KB_PA/
+  |
+  |--- README_FOR_PROFESSOR.md   — informacje dla prowadzącego
+  |--- README.md                 — dokumentacja projektu
+  |--- requirements.txt          — zależności Python
+  |
+  |--- data/
+  |    |--- raw/
+  |    |    |--- ZRODLO.md                       — opis źródła danych
+  |    |    |--- Car_Prices_Poland_Kaggle.csv     — dane surowe (nie w Git)
+  |    |--- processed/
+  |         |--- cars_clean.csv                  — dane po czyszczeniu
+  |         |--- model_results.csv               — wyniki modeli
+  |
+  |--- notebooks/
+  |    |--- 01_EDA.ipynb            — eksploracja i wizualizacja
+  |    |--- 02_preprocessing.ipynb  — czyszczenie i inżynieria cech
+  |    |--- 03_modeling.ipynb       — modelowanie i ewaluacja
+  |    |--- 04_visualization.ipynb  — wykresy końcowe
+  |
+  |--- src/
+  |    |--- data_utils.py   — funkcje do wczytywania i czyszczenia danych
+  |    |--- plot_utils.py   — funkcje do wizualizacji
+  |
+  |--- reports/
+  |    |--- figures/        — wyeksportowane wykresy (.png)
+  |    |--- raport.txt      — niniejszy raport
+  |
+  |--- replication/
+       |--- run_all.py          — skrypt replikujący całą analizę
+       |--- generate_notebooks.py
+       |--- INSTRUKCJA.md       — krok po kroku jak odtworzyć wyniki
+
+========================================================================
+    Projekt_DB_KB_PA | Grupa 6 | Gr1 | 2025/2026
+========================================================================
+
